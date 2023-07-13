@@ -13,6 +13,7 @@
                 <argument type="service" id="maker.file_link_formatter" />
                 <argument>%kernel.project_dir%</argument>
                 <argument>%twig.default_path%</argument>
+                <argument>%kernel.bundles%</argument>
             </service>
 
             <service id="maker.autoloader_finder" class="Symfony\Bundle\MakerBundle\Util\ComposerAutoloaderFinder" >

@@ -1,0 +1,2 @@
+bundles:
+    - Symfony\Bundle\MakerBundle\MakerBundle

@@ -1,0 +1,12 @@
+services:
+    Symfony\Bundle\MakerBundle\Maker\MakeOroCrud:
+        arguments:
+            - '@maker.doctrine_helper'
+            - '@maker.renderer.form_type_renderer'
+            - '@Symfony\Bundle\MakerBundle\Util\GridHelper'
+        tags:
+            - { name: maker.command }
+
+    Symfony\Bundle\MakerBundle\Util\GridHelper:
+        arguments:
+            - '@maker.doctrine_helper'

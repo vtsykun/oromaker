@@ -29,10 +29,17 @@ use Symfony\UX\Turbo\Attribute\Broadcast;
  */
 final class EntityClassGenerator
 {
+    private bool $useAnnotation = false;
+
     public function __construct(
         private Generator $generator,
         private DoctrineHelper $doctrineHelper,
     ) {
+    }
+
+    public function useAnnotation(bool $flag): void
+    {
+        $this->useAnnotation = $flag;
     }
 
     public function generateEntityClass(ClassNameDetails $entityClassDetails, bool $apiResource, bool $withPasswordUpgrade = false, bool $generateRepositoryClass = true, bool $broadcast = false): string
@@ -61,7 +68,7 @@ final class EntityClassGenerator
 
         $entityPath = $this->generator->generateClass(
             $entityClassDetails->getFullName(),
-            'doctrine/Entity.tpl.php',
+            $this->useAnnotation ? 'doctrine/Entity-ann.tpl.php' : 'doctrine/Entity.tpl.php',
             [
                 'use_statements' => $useStatements,
                 'repository_class_name' => $repoClassDetails->getShortName(),

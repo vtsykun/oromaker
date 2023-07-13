@@ -15,6 +15,7 @@ use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Symfony\Bundle\MakerBundle\ConsoleStyle;
 use Symfony\Bundle\MakerBundle\DependencyBuilder;
 use Symfony\Bundle\MakerBundle\Doctrine\DoctrineHelper;
+use Symfony\Bundle\MakerBundle\FileManager;
 use Symfony\Bundle\MakerBundle\Generator;
 use Symfony\Bundle\MakerBundle\InputConfiguration;
 use Symfony\Bundle\MakerBundle\Renderer\FormTypeRenderer;
@@ -34,8 +35,11 @@ use Symfony\Component\Validator\Validation;
  */
 final class MakeForm extends AbstractMaker
 {
-    public function __construct(private DoctrineHelper $entityHelper, private FormTypeRenderer $formTypeRenderer)
-    {
+    public function __construct(
+        private DoctrineHelper $entityHelper,
+        private FormTypeRenderer $formTypeRenderer,
+        private FileManager $fileManager,
+    ) {
     }
 
     public static function getCommandName(): string
@@ -77,17 +81,17 @@ final class MakeForm extends AbstractMaker
 
     public function generate(InputInterface $input, ConsoleStyle $io, Generator $generator): void
     {
-        $formClassNameDetails = $generator->createClassNameDetails(
-            $input->getArgument('name'),
-            'Form\\',
-            'Type'
-        );
+        $name = $input->getArgument('name');
+        $boundClass = $input->getArgument('bound-class');
+        if (null !== $boundClass && ($namespace = $this->fileManager->getBundlesNamespacePrefixForClass($boundClass))) {
+            $name = $namespace . '\\Form\\Type\\' . $name;
+        }
 
+        $formClassNameDetails = $generator->createClassNameDetails($name, '', 'Type');
         $formFields = ['field_name' => null];
 
-        $boundClass = $input->getArgument('bound-class');
         $boundClassDetails = null;
-
+        $doctrineEntityDetails = null;
         if (null !== $boundClass) {
             $boundClassDetails = $generator->createClassNameDetails(
                 $boundClass,
@@ -107,7 +111,8 @@ final class MakeForm extends AbstractMaker
         $this->formTypeRenderer->render(
             $formClassNameDetails,
             $formFields,
-            $boundClassDetails
+            $boundClassDetails,
+            metadata: $doctrineEntityDetails?->getMetadata()
         );
 
         $generator->writeChanges();

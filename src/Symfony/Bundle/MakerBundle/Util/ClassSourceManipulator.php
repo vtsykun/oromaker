@@ -53,6 +53,8 @@ final class ClassSourceManipulator
     private PrettyPrinter $printer;
     private ?ConsoleStyle $io = null;
 
+    private bool $useAnnotation = false;
+
     private ?array $oldStmts = null;
     private array $oldTokens = [];
     private array $newStmts = [];
@@ -82,6 +84,11 @@ final class ClassSourceManipulator
         $this->io = $io;
     }
 
+    public function setUseAnnotation(bool $flag): void
+    {
+        $this->useAnnotation = $flag;
+    }
+
     public function getSourceCode(): string
     {
         return $this->sourceCode;
@@ -90,11 +97,8 @@ final class ClassSourceManipulator
     public function addEntityField(string $propertyName, array $columnOptions, array $comments = []): void
     {
         $typeHint = DoctrineHelper::getPropertyTypeForColumn($columnOptions['type']);
-        if ($typeHint && DoctrineHelper::canColumnTypeBeInferredByPropertyType($columnOptions['type'], $typeHint)) {
-            unset($columnOptions['type']);
-        }
 
-        if (isset($columnOptions['type'])) {
+        if (!($typeHint && DoctrineHelper::canColumnTypeBeInferredByPropertyType($columnOptions['type'], $typeHint))) {
             $typeConstant = DoctrineHelper::getTypeConstant($columnOptions['type']);
             if ($typeConstant) {
                 $this->addUseStatementIfNecessary(Types::class);
@@ -107,7 +111,11 @@ final class ClassSourceManipulator
 
         $nullable = $columnOptions['nullable'] ?? false;
         $isId = (bool) ($columnOptions['id'] ?? false);
+
         $attributes[] = $this->buildAttributeNode(Column::class, $columnOptions, 'ORM');
+        if ($this->useAnnotation) {
+            $comments[] = $this->buildAnnotationComment(Column::class, $columnOptions, 'ORM');
+        }
 
         $defaultValue = null;
         if ('array' === $typeHint && !$nullable) {
@@ -152,14 +160,20 @@ final class ClassSourceManipulator
         $attributes = [
             $this->buildAttributeNode(
                 Embedded::class,
-                ['class' => new ClassNameValue($className, $typeHint)],
+                $columnOptions = ['class' => new ClassNameValue($className, $typeHint)],
                 'ORM'
             ),
         ];
 
+        $comments = [];
+        if ($this->useAnnotation) {
+            $comments[] = $this->buildAnnotationComment(Embedded::class, $columnOptions, 'ORM');
+        }
+
         $this->addProperty(
             name: $propertyName,
             attributes: $attributes,
+            comments: $comments,
             propertyType: $typeHint,
         );
 
@@ -357,6 +371,10 @@ final class ClassSourceManipulator
             return;
         }
 
+        if ($this->useAnnotation) {
+            $attributes = [];
+        }
+
         $newPropertyBuilder = (new Builder\Property($name))->makePrivate();
 
         if (null !== $propertyType) {
@@ -386,6 +404,10 @@ final class ClassSourceManipulator
         $this->addUseStatementIfNecessary($attributeClass);
 
         $classNode = $this->getClassNode();
+
+        if ($this->useAnnotation) {
+          //  $classNode->setDocComment() = $this->buildAnnotationComment(Column::class, $columnOptions, 'ORM');
+        }
 
         $classNode->attrGroups[] = new Node\AttributeGroup([$this->buildAttributeNode($attributeClass, $options)]);
 
@@ -480,10 +502,24 @@ final class ClassSourceManipulator
             $attributes[] = $this->buildAttributeNode(JoinColumn::class, ['nullable' => false], 'ORM');
         }
 
+        $comments = [];
+        if ($this->useAnnotation) {
+            $comments[] = $this->buildAnnotationComment(
+                $relation instanceof RelationManyToOne ? ManyToOne::class : OneToOne::class,
+                $annotationOptions,
+                'ORM'
+            );
+
+            if (!$relation->isNullable() && $relation->isOwning()) {
+                $comments[] = $this->buildAnnotationComment(JoinColumn::class, ['nullable' => false], 'ORM');
+            }
+        }
+
         $this->addProperty(
             name: $relation->getPropertyName(),
             defaultValue: null,
-            attributes: $attributes,
+            attributes: $this->useAnnotation ? []: $attributes,
+            comments: $comments,
             propertyType: '?'.$typeHint,
         );
 
@@ -558,9 +594,19 @@ final class ClassSourceManipulator
             ),
         ];
 
+        $comments = [];
+        if ($this->useAnnotation) {
+            $comments[] = $this->buildAnnotationComment(
+                $relation instanceof RelationManyToMany ? ManyToMany::class : OneToMany::class,
+                $annotationOptions,
+                'ORM'
+            );
+        }
+
         $this->addProperty(
             name: $relation->getPropertyName(),
-            attributes: $attributes,
+            attributes: $this->useAnnotation ? [] : $attributes,
+            comments: $comments,
             propertyType: $collectionTypeHint,
         );
 
@@ -825,6 +871,30 @@ final class ClassSourceManipulator
         $this->updateSourceCodeFromNewStmts();
 
         return $shortClassName;
+    }
+
+    /// @ORM\Column(name="name", type="string", length=255, nullable=false, unique=true)
+    public function buildAnnotationComment(string $attributeClass, array $options, string $attributePrefix = null)
+    {
+        $options = $this->sortOptionsByClassConstructorParameters($options, $attributeClass);
+        $class = $attributePrefix ? sprintf('%s\\%s', $attributePrefix, Str::getShortClassName($attributeClass)) : Str::getShortClassName($attributeClass);
+
+        $optString = [];
+        foreach ($options as $name => $value) {
+            if (is_string($value)) {
+                $value = '"'.$value.'"';
+            } else if (is_bool($value)) {
+                $value = $value ? 'true' : 'false';
+            } else if (is_object($value)) {
+                $value = '"' . (string) $value . '"';
+            }
+
+            $optString[] = "$name=$value";
+        }
+
+        $optString = implode(', ', $optString);
+
+        return "@$class($optString)";
     }
 
     /**

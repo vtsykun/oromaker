@@ -1,35 +1,14 @@
-<?= $helper->getHeadPrintCode($entity_class_name.' index'); ?>
+{% extends '@OroUI/actions/index.html.twig' %}
+{% import '@OroUI/macros.html.twig' as UI %}
+{% set pageTitle = '<?= $trans_prefix ?>.entity_plural_label'|trans %}
 
-{% block body %}
-    <h1><?= $entity_class_name ?> index</h1>
-
-    <table class="table">
-        <thead>
-            <tr>
-<?php foreach ($entity_fields as $field): ?>
-                <th><?= ucfirst($field['fieldName']) ?></th>
-<?php endforeach; ?>
-                <th>actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for <?= $entity_twig_var_singular ?> in <?= $entity_twig_var_plural ?> %}
-            <tr>
-<?php foreach ($entity_fields as $field): ?>
-                <td>{{ <?= $helper->getEntityFieldPrintCode($entity_twig_var_singular, $field) ?> }}</td>
-<?php endforeach; ?>
-                <td>
-                    <a href="{{ path('<?= $route_name ?>_show', {'<?= $entity_identifier ?>': <?= $entity_twig_var_singular ?>.<?= $entity_identifier ?>}) }}">show</a>
-                    <a href="{{ path('<?= $route_name ?>_edit', {'<?= $entity_identifier ?>': <?= $entity_twig_var_singular ?>.<?= $entity_identifier ?>}) }}">edit</a>
-                </td>
-            </tr>
-        {% else %}
-            <tr>
-                <td colspan="<?= (count($entity_fields) + 1) ?>">no records found</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-
-    <a href="{{ path('<?= $route_name ?>_new') }}">Create new</a>
+{% block navButtons %}
+    {% if is_granted('<?= $route_prefix ?>_create') %}
+        <div class="btn-group">
+            {{ UI.addButton({
+                'path' : path('<?= $route_prefix ?>_create'),
+                'entity_label': '<?= $trans_prefix ?>.entity_label'|trans,
+            }) }}
+        </div>
+    {% endif %}
 {% endblock %}

@@ -158,6 +158,21 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
         }
     }
 
+    protected function isUseAnnotation(string $className)
+    {
+        $namespace = Str::getNamespace($className);
+
+        $selectedProbe = null;
+        foreach ($this->doctrineHelper->getEntitiesForAutocomplete() as $probe) {
+            if (str_starts_with($probe, $namespace)) {
+                $selectedProbe = $namespace;
+                break;
+            }
+        }
+
+        return $selectedProbe && !$this->doesEntityUseAttributeMapping($selectedProbe);
+    }
+
     public function generate(InputInterface $input, ConsoleStyle $io, Generator $generator): void
     {
         $overwrite = $input->getOption('overwrite');
@@ -175,9 +190,11 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
             'Entity\\'
         );
 
-        $classExists = class_exists($entityClassDetails->getFullName());
+        $classExists = class_exists($className = $entityClassDetails->getFullName());
         if (!$classExists) {
             $broadcast = $input->getOption('broadcast');
+            $this->entityClassGenerator->useAnnotation($this->isUseAnnotation($className));
+
             $entityPath = $this->entityClassGenerator->generateEntityClass(
                 $entityClassDetails,
                 $input->getOption('api-resource'),
@@ -202,7 +219,7 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
         }
 
         if (!$this->doesEntityUseAttributeMapping($entityClassDetails->getFullName())) {
-            throw new RuntimeCommandException(sprintf('Only attribute mapping is supported by make:entity, but the <info>%s</info> class uses a different format. If you would like this command to generate the properties & getter/setter methods, add your mapping configuration, and then re-run this command with the <info>--regenerate</info> flag.', $entityClassDetails->getFullName()));
+         //   throw new RuntimeCommandException(sprintf('Only attribute mapping is supported by make:entity, but the <info>%s</info> class uses a different format. If you would like this command to generate the properties & getter/setter methods, add your mapping configuration, and then re-run this command with the <info>--regenerate</info> flag.', $entityClassDetails->getFullName()));
         }
 
         if ($classExists) {
@@ -219,7 +236,7 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
         }
 
         $currentFields = $this->getPropertyNames($entityClassDetails->getFullName());
-        $manipulator = $this->createClassManipulator($entityPath, $io, $overwrite);
+        $manipulator = $this->createClassManipulator($entityClassDetails->getFullName(), $io, $overwrite);
 
         $isFirstField = true;
         while (true) {
@@ -247,7 +264,7 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
                     $otherManipulator = $manipulator;
                 } else {
                     $otherManipulatorFilename = $this->getPathOfClass($newField->getInverseClass());
-                    $otherManipulator = $this->createClassManipulator($otherManipulatorFilename, $io, $overwrite);
+                    $otherManipulator = $this->createClassManipulator($newField->getInverseClass(), $io, $overwrite);
                 }
                 switch ($newField->getType()) {
                     case EntityRelation::MANY_TO_ONE:
@@ -262,7 +279,7 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
                             // the new field being added to THIS entity is the inverse
                             $newFieldName = $newField->getInverseProperty();
                             $otherManipulatorFilename = $this->getPathOfClass($newField->getOwningClass());
-                            $otherManipulator = $this->createClassManipulator($otherManipulatorFilename, $io, $overwrite);
+                            $otherManipulator = $this->createClassManipulator($newField->getOwningClass(), $io, $overwrite);
 
                             // The *other* class will receive the ManyToOne
                             $otherManipulator->addManyToOneRelation($newField->getOwningRelation());
@@ -805,12 +822,17 @@ final class MakeEntity extends AbstractMaker implements InputAwareMakerInterface
         return $io->askQuestion($question);
     }
 
-    private function createClassManipulator(string $path, ConsoleStyle $io, bool $overwrite): ClassSourceManipulator
+    private function createClassManipulator(string $className, ConsoleStyle $io, bool $overwrite): ClassSourceManipulator
     {
+        $path = $this->getPathOfClass($className);
+
         $manipulator = new ClassSourceManipulator(
             sourceCode: $this->fileManager->getFileContents($path),
             overwrite: $overwrite,
         );
+
+        $useAnnotation = $this->doesEntityUseAttributeMapping($className);
+        $manipulator->setUseAnnotation(!$useAnnotation);
 
         $manipulator->setIo($io);
 

@@ -25,6 +25,9 @@ use Symfony\Component\Filesystem\Filesystem;
 class FileManager
 {
     private ?SymfonyStyle $io = null;
+    private bool $dryRun = true;
+
+    private array $bundlesNamespace = [];
 
     public function __construct(
         private Filesystem $fs,
@@ -32,9 +35,27 @@ class FileManager
         private MakerFileLinkFormatter $makerFileLinkFormatter,
         private string $rootDirectory,
         private ?string $twigDefaultPath = null,
+        private array $bundles = [],
     ) {
         $this->rootDirectory = rtrim($this->realPath($this->normalizeSlashes($rootDirectory)), '/');
         $this->twigDefaultPath = $twigDefaultPath ? rtrim($this->relativizePath($twigDefaultPath), '/') : null;
+
+        foreach ($this->bundles as $name => $bundle) {
+            $bundle = explode('\\', $bundle);
+            array_pop($bundle);
+            $bundle = implode('\\', $bundle);
+            $this->bundlesNamespace[$name] = $bundle;
+        }
+    }
+
+    public function setDryRun(bool $flag): void
+    {
+        $this->dryRun = $flag;
+    }
+
+    public function isDryRun(): bool
+    {
+        return $this->dryRun;
     }
 
     public function setIO(SymfonyStyle $io): void
@@ -62,7 +83,10 @@ class FileManager
             $comment = '<fg=green>no change</>';
         }
 
-        $this->fs->dumpFile($absolutePath, $content);
+        if (false === $this->dryRun) {
+            $this->fs->dumpFile($absolutePath, $content);
+        }
+
         $relativePath = $this->relativizePath($filename);
 
         $this->io?->comment(sprintf(
@@ -70,6 +94,10 @@ class FileManager
             $comment,
             $this->makerFileLinkFormatter->makeLinkedPath($absolutePath, $relativePath)
         ));
+
+        if ($this->dryRun) {
+            $this->io->write("\n\n$content\n");
+        }
     }
 
     public function fileExists($path): bool
@@ -141,6 +169,28 @@ class FileManager
         $path = $this->autoloaderUtil->getPathForFutureClass($className);
 
         return null === $path ? null : $this->relativizePath($path);
+    }
+
+    public function getBundlesNamespacePrefixForClass(string $className): string
+    {
+        foreach ($this->bundlesNamespace as $namespace) {
+            if (str_starts_with($className, $namespace)) {
+                return $namespace;
+            }
+        }
+
+        return $this->autoloaderUtil->getNamespacePrefixForClass($className);
+    }
+
+    public function getBundleName(string $className): ?string
+    {
+        foreach ($this->bundlesNamespace as $name => $namespace) {
+            if (str_starts_with($className, $namespace)) {
+                return $name;
+            }
+        }
+
+        return null;
     }
 
     public function getNamespacePrefixForClass(string $className): string

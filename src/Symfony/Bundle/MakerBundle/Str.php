@@ -13,6 +13,7 @@ namespace Symfony\Bundle\MakerBundle;
 
 use Doctrine\Inflector\Inflector;
 use Doctrine\Inflector\InflectorFactory;
+use Oro\Bundle\EntityConfigBundle\Tools\ConfigHelper;
 use Symfony\Component\DependencyInjection\Container;
 
 /**
@@ -95,14 +96,28 @@ final class Str
 
     public static function asRoutePath(string $value): string
     {
-        return '/'.str_replace('_', '/', self::asTwigVariable($value));
+        return '/'.str_replace('_', '-', self::asTwigVariable($value));
     }
 
-    public static function asRouteName(string $value): string
+    public static function asBundlePrefix(string $bundlePrefix): string
     {
+        $bundlePrefix = str_ireplace('bundle', '', $bundlePrefix);
+        $bundlePrefix = self::asTwigVariable($bundlePrefix);
+        @[$t1, $t2] = explode('_', $bundlePrefix, 2);
+        return $t1 . '_' . str_replace('_', '', (string)$t2) . '_';
+    }
+
+    public static function asRouteName(string $value, string $bundlePrefix = null): string
+    {
+        $bundlePrefix = $bundlePrefix ? self::asBundlePrefix($bundlePrefix) : '';
         $routeName = self::asTwigVariable($value);
 
-        return str_starts_with($routeName, 'app_') ? $routeName : 'app_'.$routeName;
+        return $bundlePrefix . $routeName;
+    }
+
+    public static function getEntityLabel(string $className, string $fieldName): string
+    {
+        return ConfigHelper::getTranslationKey('entity', 'label', $className, $fieldName);
     }
 
     public static function asSnakeCase(string $value): string

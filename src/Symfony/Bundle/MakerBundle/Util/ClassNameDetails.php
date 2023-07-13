@@ -19,8 +19,14 @@ final class ClassNameDetails
         private string $fullClassName,
         private string $namespacePrefix,
         private ?string $suffix = null,
+        private ?string $bundleName = null,
     ) {
         $this->namespacePrefix = trim($namespacePrefix, '\\');
+    }
+
+    public function getBundleName(): ?string
+    {
+        return $this->bundleName;
     }
 
     public function getFullName(): string
@@ -43,6 +49,18 @@ final class ClassNameDetails
     public function getRelativeName(): string
     {
         return str_replace($this->namespacePrefix.'\\', '', $this->fullClassName);
+    }
+
+    public function getNamespacePrefix(): string
+    {
+        return $this->namespacePrefix;
+    }
+
+    public function buildRelativeName(string $namespacePrefix, string $suffix = ''): string
+    {
+        $fullNamespacePrefix = rtrim($this->namespacePrefix, '\\') . '\\'. trim($namespacePrefix, '\\');
+
+        return $fullNamespacePrefix . '\\' . $this->getShortName() . $suffix;
     }
 
     public function getRelativeNameWithoutSuffix(): string

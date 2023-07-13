@@ -37,6 +37,10 @@ class MakerExtension extends Extension
         $loader->load('services.xml');
         $loader->load('makers.xml');
 
+
+        $ymlLoader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
+        $ymlLoader->load('services.yml');
+
         /**
          * @deprecated remove this block when removing make:unit-test and make:functional-test
          */

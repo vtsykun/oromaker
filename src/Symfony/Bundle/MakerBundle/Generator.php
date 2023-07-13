@@ -44,6 +44,21 @@ class Generator
         $this->templateComponentGenerator = $templateComponentGenerator;
     }
 
+    public function addContentToFile(string $targetPath, string $contents): void
+    {
+        if (file_exists($targetPath) && !$this->fileManager->isDryRun()) {
+            $baseData = file_get_contents($targetPath);
+            $contents = $baseData . "\n\n" . $contents;
+        }
+
+        $this->dumpFile($targetPath, $contents);
+    }
+
+    public function getRelativePathForFutureClass(string $className): ?string
+    {
+        return $this->fileManager->getRelativePathForFutureClass($className);
+    }
+
     /**
      * Generate a new file for a class from a template.
      *
@@ -140,12 +155,12 @@ class Generator
      * @param string $namespacePrefix Recommended namespace where this class should live, but *without* the "App\\" part
      * @param string $suffix          Optional suffix to guarantee is on the end of the class
      */
-    public function createClassNameDetails(string $name, string $namespacePrefix, string $suffix = '', string $validationErrorMessage = ''): ClassNameDetails
+    public function createClassNameDetails(string $name, ?string $namespacePrefix = null, string $suffix = '', string $validationErrorMessage = ''): ClassNameDetails
     {
         $fullNamespacePrefix = $this->namespacePrefix.'\\'.$namespacePrefix;
-        if ('\\' === $name[0]) {
+        if ('\\' === $name[0] || str_contains($name, '\\')) {
             // class is already "absolute" - leave it alone (but strip opening \)
-            $className = substr($name, 1);
+            $className = '\\' === $name[0] ? substr($name, 1) : $name;
         } else {
             $className = rtrim($fullNamespacePrefix, '\\').'\\'.Str::asClassName($name, $suffix);
         }
@@ -155,10 +170,10 @@ class Generator
         // if this is a custom class, we may be completely different than the namespace prefix
         // the best way can do, is find the PSR4 prefix and use that
         if (!str_starts_with($className, $fullNamespacePrefix)) {
-            $fullNamespacePrefix = $this->fileManager->getNamespacePrefixForClass($className);
+            $fullNamespacePrefix = $this->fileManager->getBundlesNamespacePrefixForClass($className);
         }
 
-        return new ClassNameDetails($className, $fullNamespacePrefix, $suffix);
+        return new ClassNameDetails($className, $fullNamespacePrefix, $suffix, $this->fileManager->getBundleName($className));
     }
 
     public function getRootDirectory(): string

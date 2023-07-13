@@ -41,6 +41,11 @@ final class EntityDetails
         return $this->metadata->fieldMappings;
     }
 
+    public function getMetadata(): \Doctrine\ORM\Mapping\ClassMetadata|ClassMetadata
+    {
+        return $this->metadata;
+    }
+
     public function getFormFields(): array
     {
         $fields = (array) $this->metadata->fieldNames;

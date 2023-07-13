@@ -24,6 +24,7 @@ use Symfony\Bundle\MakerBundle\Validator;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -51,6 +52,7 @@ final class MakerCommand extends Command
     protected function configure(): void
     {
         $this->maker->configureCommand($this, $this->inputConfig);
+        $this->addOption('write', null, InputOption::VALUE_NONE, 'Write changes');
     }
 
     protected function initialize(InputInterface $input, OutputInterface $output): void
@@ -71,11 +73,13 @@ final class MakerCommand extends Command
     protected function interact(InputInterface $input, OutputInterface $output): void
     {
         if (!$this->fileManager->isNamespaceConfiguredToAutoload($this->generator->getRootNamespace())) {
-            $this->io->note([
-                sprintf('It looks like your app may be using a namespace other than "%s".', $this->generator->getRootNamespace()),
-                'To configure this and make your life easier, see: https://symfony.com/doc/current/bundles/SymfonyMakerBundle/index.html#configuration',
-            ]);
+//            $this->io->note([
+//                sprintf('It looks like your app may be using a namespace other than "%s".', $this->generator->getRootNamespace()),
+//                'To configure this and make your life easier, see: https://symfony.com/doc/current/bundles/SymfonyMakerBundle/index.html#configuration',
+//            ]);
         }
+
+        $this->fileManager->setDryRun(!$input->getOption('write'));
 
         foreach ($this->getDefinition()->getArguments() as $argument) {
             if ($input->getArgument($argument->getName())) {
@@ -98,6 +102,8 @@ final class MakerCommand extends Command
         if ($output->isVerbose()) {
             $this->linter->writeLinterMessage($output);
         }
+
+        $this->fileManager->setDryRun(!$input->getOption('write'));
 
         $this->maker->generate($input, $this->io, $this->generator);
 
